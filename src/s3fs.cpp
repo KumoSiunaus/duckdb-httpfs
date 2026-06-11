@@ -597,7 +597,13 @@ unique_ptr<HTTPResponse> S3FileSystem::PostRequest(HTTPInput &input, string url,
 			                         "", payload_hash, "application/octet-stream");
 		}
 
-		return HTTPFileSystem::PostRequest(input, http_url, headers, result, buffer_in, buffer_in_len);
+		auto res = HTTPFileSystem::PostRequest(input, http_url, headers, result, buffer_in, buffer_in_len);
+		// PostRequest reports HTTP failures through the response status; surface them as an
+		// exception so ExecuteWithRefresh can refresh the credentials and retry.
+		if (static_cast<int>(res->status) >= 400) {
+			throw HTTPException(*res, "HTTP POST error on '%s' (HTTP %d)", http_url, static_cast<int>(res->status));
+		}
+		return res;
 	});
 }
 
@@ -622,7 +628,13 @@ unique_ptr<HTTPResponse> S3FileSystem::PutRequest(HTTPInput &input, string url, 
 			                         "", payload_hash, content_type);
 		}
 
-		return HTTPFileSystem::PutRequest(input, http_url, headers, buffer_in, buffer_in_len);
+		auto res = HTTPFileSystem::PutRequest(input, http_url, headers, buffer_in, buffer_in_len);
+		// PutRequest reports HTTP failures through the response status; surface them as an
+		// exception so ExecuteWithRefresh can refresh the credentials and retry.
+		if (static_cast<int>(res->status) >= 400) {
+			throw HTTPException(*res, "HTTP PUT error on '%s' (HTTP %d)", http_url, static_cast<int>(res->status));
+		}
+		return res;
 	});
 }
 
